@@ -1,4 +1,4 @@
-import { Message } from '../../../../domain/message';
+import { Message } from '@/messages/domain/message';
 import { MessageEntity } from '../entities/message.entity';
 
 export class MessageMapper {

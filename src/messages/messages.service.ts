@@ -1,6 +1,10 @@
 import { CreateMessageDto } from './dto/create-message.dto';
 import { Injectable } from '@nestjs/common';
-import { MessageRepository } from './infrastructure/persistence/message.repository';
+import {
+  ConversationItem,
+  MessageRepository,
+  MessageThreadItem,
+} from './infrastructure/persistence/message.repository';
 import { Message } from './domain/message';
 import { NullableType } from '@/utils/types/nullable.type';
 
@@ -14,5 +18,13 @@ export class MessagesService {
 
   async findById(id: Message['id']): Promise<NullableType<Message>> {
     return this.messageRepository.findById(id);
+  }
+
+  async findConversations(): Promise<ConversationItem[]> {
+    return this.messageRepository.findConversations();
+  }
+
+  async findBySenderId(senderId: string): Promise<MessageThreadItem[]> {
+    return this.messageRepository.findBySenderId(senderId);
   }
 }

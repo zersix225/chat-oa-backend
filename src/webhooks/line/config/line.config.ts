@@ -11,6 +11,10 @@ class EnvironmentVariablesValidator {
   @IsString()
   @IsOptional()
   LINE_CHANNEL_SECRET: string;
+
+  @IsString()
+  @IsOptional()
+  LINE_CHANNEL_NAME: string;
 }
 
 export default registerAs<LineConfig>('line', () => {
@@ -18,5 +22,6 @@ export default registerAs<LineConfig>('line', () => {
   return {
     channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
     channelSecret: process.env.LINE_CHANNEL_SECRET,
+    channelName: process.env.LINE_CHANNEL_NAME,
   };
 });

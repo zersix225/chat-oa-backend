@@ -1,6 +1,6 @@
-import { EntityRelationalHelper } from '../../../../../utils/relational-entity-helper';
+import { EntityRelationalHelper } from '@/utils/relational-entity-helper';
 import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
-import { MessagePlatform } from '../../../../domain/message';
+import { MessagePlatform } from '@/messages/domain/message';
 
 @Entity({
   name: 'message',

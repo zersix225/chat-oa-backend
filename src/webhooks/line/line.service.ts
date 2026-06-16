@@ -4,21 +4,26 @@ import { LineBotClient, webhook } from '@line/bot-sdk';
 import { AllConfigType } from '@/config/config.type';
 import { MessagesService } from '@/messages/messages.service';
 import { MessagePlatform } from '@/messages/domain/message';
+import { LineContactsService } from '@/line-contacts/line-contacts.service';
 
 @Injectable()
 export class LineService {
   private readonly logger = new Logger(LineService.name);
   private readonly client: LineBotClient;
+  private readonly channelName: string;
 
   constructor(
     private readonly configService: ConfigService<AllConfigType>,
     private readonly messagesService: MessagesService,
+    private readonly lineContactsService: LineContactsService,
   ) {
     this.client = LineBotClient.fromChannelAccessToken({
       channelAccessToken:
         this.configService.get('line.channelAccessToken', { infer: true }) ??
         '',
     });
+    this.channelName =
+      this.configService.get('line.channelName', { infer: true }) ?? '';
   }
 
   async handleWebhook(events: webhook.Event[]) {
@@ -26,31 +31,48 @@ export class LineService {
     return { status: 'ok' };
   }
 
-  private async handleEvent(event: webhook.Event) {
-    this.logger.log(
-      `Received event type: ${event.type} from userId: ${event.source?.userId}`,
-    );
-    this.logger.log(event);
+  async pushMessage(message: string, lineUserId: string) {
+    try {
+      await this.client.pushMessage({
+        to: lineUserId,
+        messages: [{ type: 'text', text: message }],
+      });
+    } catch (error) {
+      this.logger.error('pushMessage failed', error);
+      throw error;
+    }
+  }
 
-    const lineName = await this.client.getProfile(event.source?.userId ?? '');
-    const msgRes: string = `สวัสดีค่ะคุณ ${lineName.displayName} ยินดีต้อนรับสู่ PCM ค่ะ 😊ร้านเราจำหน่าย [สินค้า/บริการ] ดูแลผิวหน้าและผิวกายอย่างปลอดภัย`;
+  private async handleEvent(event: webhook.Event) {
+    const userId = event.source?.userId;
+    if (!userId) return;
+
+    const profile = await this.client.getProfile(userId);
+
+    await this.lineContactsService.upsertByLineUserId({
+      lineUserId: userId,
+      displayName: profile.displayName,
+      pictureUrl: profile.pictureUrl ?? null,
+    });
 
     if (event.type === 'message' && event.message.type === 'text') {
-      const msgChat = event.message.text;
-      const senderId = event.source?.userId ?? '';
-      const timestamp = event.timestamp;
-
       await this.messagesService.create({
-        content: msgChat,
-        senderId,
+        content: event.message.text,
+        senderId: userId,
         messagePlatform: MessagePlatform.LINE,
-        timestamp: new Date(timestamp),
+        timestamp: new Date(event.timestamp),
       });
 
       await this.client.replyMessage({
         replyToken: event.replyToken ?? '',
-        messages: [{ type: 'text', text: msgRes }],
+        messages: [
+          { type: 'text', text: this.buildWelcomeMessage(profile.displayName) },
+        ],
       });
     }
+  }
+
+  private buildWelcomeMessage(displayName: string): string {
+    return `สวัสดีค่ะคุณ ${displayName} ยินดีต้อนรับสู่ ${this.channelName} ค่ะ 😊`;
   }
 }

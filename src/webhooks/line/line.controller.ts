@@ -4,11 +4,14 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  UseGuards,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { webhook } from '@line/bot-sdk';
 import { LineService } from './line.service';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { PushMessageDto } from './dto/push-message.dto';
 
 @ApiTags('Webhooks')
 @Controller({
@@ -22,5 +25,13 @@ export class LineController {
   @HttpCode(HttpStatus.OK)
   receiveWebhook(@Body() body: webhook.CallbackRequest) {
     return this.lineService.handleWebhook(body.events);
+  }
+
+  @Post('line/push')
+  // @UseGuards(AuthGuard('jwt'))
+  @ApiSecurity('bearer')
+  @HttpCode(HttpStatus.OK)
+  pushMessage(@Body() body: PushMessageDto) {
+    return this.lineService.pushMessage(body.message, body.lineUserId);
   }
 }
