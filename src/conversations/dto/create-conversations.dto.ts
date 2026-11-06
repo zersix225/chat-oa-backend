@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class CreateConversationsDto {
   @ApiProperty({
@@ -10,7 +10,10 @@ export class CreateConversationsDto {
 
   @ApiProperty({
     type: String,
+    required: false,
+    nullable: true,
   })
+  @IsOptional()
   @IsString()
   lastMessageId?: string | null;
 }

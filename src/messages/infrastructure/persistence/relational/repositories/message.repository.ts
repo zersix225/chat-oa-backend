@@ -7,7 +7,7 @@ import {
   MessageRepository,
   MessageThreadItem,
 } from '../../message.repository';
-import { Message, SenderType } from '@/messages/domain/message';
+import { Message } from '@/messages/domain/message';
 import { MessageMapper } from '../mappers/message.mapper';
 import { NullableType } from '@/utils/types/nullable.type';
 import { DeepPartial } from '@/utils/types/deep-partial.type';
@@ -41,7 +41,6 @@ export class MessagesRelationalRepository implements MessageRepository {
         admin: true,
       },
       where: {
-        senderType: SenderType.ADMIN,
         conversationId: conversationId,
       },
       order: {

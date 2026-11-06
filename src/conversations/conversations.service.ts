@@ -45,8 +45,12 @@ export class ConversationsService {
     });
   }
 
-  findById(id: Conversations['id']) {
-    return this.conversationsRepository.findById(id);
+  async findById(id: Conversations['id']) {
+    const conversation = await this.conversationsRepository.findById(id);
+    if (!conversation) {
+      throw new NotFoundException(`Conversation ${id} not found`);
+    }
+    return conversation;
   }
 
   async findByContactId(contactId: Conversations['contactId']) {

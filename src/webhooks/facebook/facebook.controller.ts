@@ -51,12 +51,16 @@ export class FacebookController {
     const token = hubVerifyToken;
     const challenge = hubChallenge;
 
-    if (mode && token) {
-      if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-        return res.status(HttpStatus.OK).send(challenge);
-      } else {
-        return res.status(HttpStatus.FORBIDDEN).send('Verification failed');
-      }
+    if (!mode || !token) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .send('Missing hub.mode or hub.verify_token');
     }
+
+    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+      return res.status(HttpStatus.OK).send(challenge);
+    }
+
+    return res.status(HttpStatus.FORBIDDEN).send('Verification failed');
   }
 }

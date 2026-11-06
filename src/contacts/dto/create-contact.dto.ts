@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsEnum, IsString, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { ContactPlatform } from '@/contacts/domain/contact';
 
@@ -19,6 +19,7 @@ export class CreateContactDto {
   displayName: string;
 
   @ApiProperty({ enum: ContactPlatform })
+  @IsEnum(ContactPlatform)
   contactPlatform: ContactPlatform;
 
   @ApiProperty({
