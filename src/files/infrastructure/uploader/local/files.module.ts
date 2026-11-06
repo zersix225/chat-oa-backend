@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { FilesLocalController } from './files.controller';
 import { MulterModule } from '@nestjs/platform-express';
+import { isAllowedFileName } from '../../../file-types';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { diskStorage } from 'multer';
 import { randomStringGenerator } from '@nestjs/common/utils/random-string-generator.util';
@@ -33,7 +34,7 @@ const infrastructurePersistenceModule = (databaseConfig() as DatabaseConfig)
       useFactory: (configService: ConfigService<AllConfigType>) => {
         return {
           fileFilter: (request, file, callback) => {
-            if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/i)) {
+            if (!isAllowedFileName(file.originalname)) {
               return callback(
                 new UnprocessableEntityException({
                   status: HttpStatus.UNPROCESSABLE_ENTITY,

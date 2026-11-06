@@ -1,6 +1,14 @@
 import { registerAs } from '@nestjs/config';
 
-import { IsEnum, IsString, ValidateIf } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateIf,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import validateConfig from '../../utils/validate-config';
 import { FileDriver, FileConfig } from './file-config.type';
 
@@ -31,6 +39,13 @@ class EnvironmentVariablesValidator {
   )
   @IsString()
   AWS_S3_REGION: string;
+
+  /** Max upload / stored file size in bytes. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  FILE_MAX_SIZE?: number;
 }
 
 export default registerAs<FileConfig>('file', () => {
@@ -43,6 +58,8 @@ export default registerAs<FileConfig>('file', () => {
     secretAccessKey: process.env.SECRET_ACCESS_KEY,
     awsDefaultS3Bucket: process.env.AWS_DEFAULT_S3_BUCKET,
     awsS3Region: process.env.AWS_S3_REGION,
-    maxFileSize: 5242880, // 5mb
+    maxFileSize: process.env.FILE_MAX_SIZE
+      ? parseInt(process.env.FILE_MAX_SIZE, 10)
+      : 20971520, // 20mb
   };
 });

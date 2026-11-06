@@ -1,13 +1,29 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsDate, IsEnum, IsNotEmpty, IsString } from 'class-validator';
-import { MessagePlatform, SenderType } from '../domain/message';
+import {
+  IsDate,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
+import { MessagePlatform, MessageType, SenderType } from '../domain/message';
 
 export class CreateMessageDto {
   @ApiProperty({ type: String })
-  @IsNotEmpty()
   @IsString()
   content: string;
+
+  @ApiProperty({ enum: MessageType, required: false })
+  @IsOptional()
+  @IsEnum(MessageType)
+  messageType?: MessageType;
+
+  @ApiProperty({ type: String, required: false, nullable: true })
+  @IsOptional()
+  @IsUUID()
+  fileId?: string | null;
 
   @ApiProperty({ type: String })
   @IsNotEmpty()

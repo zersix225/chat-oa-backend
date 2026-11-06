@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, IsArray, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsArray,
+  IsOptional,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class SenderDto {
@@ -14,14 +20,48 @@ export class RecipientDto {
   id: string;
 }
 
+export class AttachmentPayloadDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  url?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  title?: string;
+}
+
+export class AttachmentDto {
+  @ApiProperty({
+    description: 'image | video | audio | file | fallback | template ...',
+  })
+  @IsString()
+  type: string;
+
+  @ApiProperty({ type: AttachmentPayloadDto, required: false })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AttachmentPayloadDto)
+  payload?: AttachmentPayloadDto;
+}
+
 class WebhookDto {
   @ApiProperty()
   @IsString()
   mid: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  text: string;
+  text?: string;
+
+  @ApiProperty({ type: AttachmentDto, isArray: true, required: false })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AttachmentDto)
+  attachments?: AttachmentDto[];
 }
 
 export class MessagingEventDto {

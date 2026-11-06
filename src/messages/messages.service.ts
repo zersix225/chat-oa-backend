@@ -4,7 +4,7 @@ import {
   ConversationItem,
   MessageRepository,
 } from './infrastructure/persistence/message.repository';
-import { Message } from './domain/message';
+import { Message, MessageType } from './domain/message';
 import { WebsocketGateway } from '@/websocket/websocket.gateway';
 import { ConversationsRepository } from '@/conversations/infrastructure/persistence/conversations.repository';
 import { IPaginationOptions } from '@/utils/types/pagination-options';
@@ -18,7 +18,10 @@ export class MessagesService {
   ) {}
 
   async create(payload: CreateMessageDto): Promise<Message> {
-    const message = await this.messageRepository.create(payload);
+    const message = await this.messageRepository.create({
+      ...payload,
+      messageType: payload.messageType ?? MessageType.TEXT,
+    });
     await this.conversationRepository.update(payload.conversationId, {
       lastMessageId: message.id,
     });
@@ -34,9 +37,11 @@ export class MessagesService {
   findAllWithPaginationByAdmin({
     paginationOptions,
     conversationId,
+    senderType,
   }: {
     paginationOptions: IPaginationOptions;
     conversationId: Message['conversationId'];
+    senderType?: Message['senderType'];
   }) {
     return this.messageRepository.findAllWithPaginationByAdmin({
       paginationOptions: {
@@ -44,6 +49,7 @@ export class MessagesService {
         limit: paginationOptions.limit,
       },
       conversationId,
+      senderType,
     });
   }
 

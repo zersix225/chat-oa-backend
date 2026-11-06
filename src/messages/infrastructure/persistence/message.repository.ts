@@ -28,9 +28,11 @@ export abstract class MessageRepository {
   abstract findAllWithPaginationByAdmin({
     paginationOptions,
     conversationId,
+    senderType,
   }: {
     paginationOptions: IPaginationOptions;
     conversationId: Message['conversationId'];
+    senderType?: Message['senderType'];
   }): Promise<{ massages: Message[]; total: number }>;
 
   abstract findById(id: Message['id']): Promise<NullableType<Message>>;

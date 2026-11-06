@@ -12,6 +12,8 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { instanceToPlain } from 'class-transformer';
+import deepResolvePromises from '@/utils/deep-resolver';
 import { AllConfigType } from '@/config/config.type';
 import { JwtPayloadType } from '@/auth/strategies/types/jwt-payload.type';
 
@@ -149,7 +151,15 @@ export class WebsocketGateway
 
   /** Emit a message that has already been saved (has an id). */
   emitNewMessage(message: { id: string; conversationId: string }): void {
-    this.server?.to(ADMINS_ROOM).emit(WsEvent.NEW_MESSAGE, message);
+    // Serialize like the HTTP API does, so `file.path` becomes a full URL
+    // (and S3 signed URLs are resolved).
+    this.toPlain(message)
+      .then((payload) =>
+        this.server?.to(ADMINS_ROOM).emit(WsEvent.NEW_MESSAGE, payload),
+      )
+      .catch((error: unknown) =>
+        this.logger.error(`Failed to emit ${WsEvent.NEW_MESSAGE}`, error),
+      );
   }
 
   emitConversationRead(event: ConversationReadEvent): void {
@@ -161,6 +171,10 @@ export class WebsocketGateway
   }
 
   // ---------- helpers ----------
+
+  private toPlain(value: object): Promise<unknown> {
+    return deepResolvePromises(instanceToPlain(value));
+  }
 
   private async broadcastViewers(conversationId: string): Promise<void> {
     const room = conversationRoom(conversationId);

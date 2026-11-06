@@ -21,18 +21,24 @@ export class MessagesRelationalRepository implements MessageRepository {
   ) {}
 
   async create(data: Message): Promise<Message> {
-    const entity = await this.messageRepository.save(
+    const saved = await this.messageRepository.save(
       this.messageRepository.create(MessageMapper.toPersistence(data)),
     );
+    // Reload so eager relations (file) are populated.
+    const entity = saved.fileId
+      ? await this.messageRepository.findOneOrFail({ where: { id: saved.id } })
+      : saved;
     return MessageMapper.toDomain(entity);
   }
 
   async findAllWithPaginationByAdmin({
     paginationOptions,
     conversationId,
+    senderType,
   }: {
     paginationOptions: IPaginationOptions;
     conversationId: Message['conversationId'];
+    senderType?: Message['senderType'];
   }): Promise<{ massages: Message[]; total: number }> {
     const [entities, total] = await this.messageRepository.findAndCount({
       skip: (paginationOptions.page - 1) * paginationOptions.limit,
@@ -42,6 +48,7 @@ export class MessagesRelationalRepository implements MessageRepository {
       },
       where: {
         conversationId: conversationId,
+        ...(senderType ? { senderType } : {}),
       },
       order: {
         timestamp: 'DESC',

@@ -2,7 +2,7 @@ import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiParam, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { MessagesService } from './messages.service';
 import { InfinityPaginationResponse } from '@/utils/dto/infinity-pagination-response.dto';
-import { FindAllConversationsDto } from '@/conversations/dto/find-all-conversations.dto';
+import { FindMessagesDto } from './dto/find-messages.dto';
 import { Message } from '@/messages/domain/message';
 
 // @UseGuards(AuthGuard('jwt'))
@@ -42,7 +42,7 @@ export class MessagesController {
     type: InfinityPaginationResponse(Message),
   })
   async findAllByAdmin(
-    @Query() query: FindAllConversationsDto,
+    @Query() query: FindMessagesDto,
     @Param('conversationId') conversationId: string,
   ) {
     const page = query?.page ?? 1;
@@ -54,6 +54,7 @@ export class MessagesController {
     return await this.messagesService.findAllWithPaginationByAdmin({
       paginationOptions: { page, limit },
       conversationId,
+      senderType: query?.senderType,
     });
   }
 }

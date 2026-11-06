@@ -2,6 +2,7 @@ import { Conversations } from '../../../../domain/conversations';
 import { ConversationsEntity } from '../entities/conversations.entity';
 import { ContactMapper } from '@/contacts/infrastructure/persistence/relational/mappers/contact.mapper';
 import { UserMapper } from '@/users/infrastructure/persistence/relational/mappers/user.mapper';
+import { MessageMapper } from '@/messages/infrastructure/persistence/relational/mappers/message.mapper';
 
 export class ConversationsMapper {
   static toDomain(raw: ConversationsEntity): Conversations {
@@ -11,8 +12,11 @@ export class ConversationsMapper {
       ? ContactMapper.toDomain(raw.contact)
       : undefined;
     domainEntity.contactId = raw.contactId;
-    domainEntity.lastMessage = raw.lastMessage;
-    domainEntity.messages = raw.messages;
+    // Map through MessageMapper so attached files serialize to full URLs.
+    domainEntity.lastMessage = raw.lastMessage
+      ? MessageMapper.toDomain(raw.lastMessage)
+      : raw.lastMessage;
+    domainEntity.messages = raw.messages?.map((m) => MessageMapper.toDomain(m));
     domainEntity.lastMessageId = raw.lastMessageId;
     domainEntity.assigneeId = raw.assigneeId ?? null;
     domainEntity.assignee = raw.assignee

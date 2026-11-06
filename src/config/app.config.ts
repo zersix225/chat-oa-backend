@@ -9,6 +9,7 @@ import {
   IsUrl,
   Max,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 enum Environment {
@@ -36,6 +37,11 @@ class EnvironmentVariablesValidator {
   @IsOptional()
   BACKEND_DOMAIN: string;
 
+  // Empty value = not set (falls back to BACKEND_DOMAIN).
+  @ValidateIf((env) => !!env.PUBLIC_BACKEND_DOMAIN)
+  @IsUrl({ require_tld: false })
+  PUBLIC_BACKEND_DOMAIN?: string;
+
   @IsString()
   @IsOptional()
   API_PREFIX: string;
@@ -58,6 +64,10 @@ export default registerAs<AppConfig>('app', () => {
     workingDirectory: process.env.PWD || process.cwd(),
     frontendDomain: process.env.FRONTEND_DOMAIN ?? 'http://localhost:5173',
     backendDomain: process.env.BACKEND_DOMAIN ?? 'http://localhost',
+    publicBackendDomain:
+      process.env.PUBLIC_BACKEND_DOMAIN ||
+      process.env.BACKEND_DOMAIN ||
+      'http://localhost',
     port: process.env.APP_PORT
       ? parseInt(process.env.APP_PORT, 10)
       : process.env.PORT

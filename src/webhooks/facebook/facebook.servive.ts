@@ -1,10 +1,23 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadGatewayException,
+  Logger,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { MessagesService } from '@/messages/messages.service';
 import {
+  AttachmentDto,
   FacebookWebhookDto,
   MessagingEventDto,
 } from '@/webhooks/facebook/dto/webhook.dto';
-import { MessagePlatform, SenderType } from '@/messages/domain/message';
+import {
+  MessagePlatform,
+  MessageType,
+  SenderType,
+} from '@/messages/domain/message';
+import { FileStorageService } from '@/files/file-storage.service';
+import { getExtension, kindFromExtension } from '@/files/file-types';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom, Observable } from 'rxjs';
 import { AxiosResponse } from 'axios';
@@ -27,6 +40,7 @@ export class FacebookService {
     private readonly contactsService: ContactsService,
     private readonly conversationsService: ConversationsService,
     private readonly httpService: HttpService,
+    private readonly fileStorage: FileStorageService,
   ) {}
 
   async handleWebhook(event: FacebookWebhookDto) {
@@ -41,9 +55,10 @@ export class FacebookService {
   }
 
   private async handleMessage(event: MessagingEventDto) {
-    if (!event.message?.text) return;
+    const text = event.message?.text;
+    const attachments = event.message?.attachments ?? [];
+    if (!text && attachments.length === 0) return;
 
-    const message = event.message.text;
     const customerId = event.sender.id;
 
     let contact = await this.contactsService.findLineUserId(customerId);
@@ -68,38 +83,161 @@ export class FacebookService {
       });
     }
 
-    await this.messagesService.create({
-      content: message,
+    const base = {
       adminId: null,
       conversationId: conversation.id,
       messagePlatform: MessagePlatform.FACEBOOK,
       senderType: SenderType.USER,
       timestamp: new Date(event.timestamp),
-    });
+    };
+
+    if (text) {
+      await this.messagesService.create({ ...base, content: text });
+    }
+    // One stored message per attachment.
+    for (const attachment of attachments) {
+      const incoming = await this.toIncomingAttachment(attachment);
+      if (incoming) {
+        await this.messagesService.create({ ...base, ...incoming });
+      }
+    }
   }
 
+  private async toIncomingAttachment(attachment: AttachmentDto): Promise<{
+    content: string;
+    messageType: MessageType;
+    fileId: string | null;
+  } | null> {
+    const typeMap: Record<string, MessageType> = {
+      image: MessageType.IMAGE,
+      video: MessageType.VIDEO,
+      audio: MessageType.AUDIO,
+      file: MessageType.FILE,
+    };
+    const messageType = typeMap[attachment.type];
+    const url = attachment.payload?.url;
+    // Skip link previews (fallback), templates, locations, etc.
+    if (!messageType || !url) return null;
+
+    let fileId: string | null = null;
+    try {
+      fileId = (await this.fileStorage.storeFromUrl(url)).id;
+    } catch (error) {
+      // Still save the message so the admin knows something was sent.
+      this.logger.warn(
+        `Could not store Facebook attachment: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    return {
+      content:
+        messageType === MessageType.FILE
+          ? (attachment.payload?.title ??
+            decodeURIComponent(new URL(url).pathname.split('/').pop() ?? ''))
+          : '',
+      messageType,
+      fileId,
+    };
+  }
+
+  /** Send text and/or a file (fileId from POST /api/v1/files/upload). */
   async pushMessage(payload: FacebookPushMessageDto) {
-    const pageId = this.configService.get('facebook.pageId', { infer: true });
+    const text = payload.message?.text;
+    if (!text && !payload.fileId) {
+      throw new UnprocessableEntityException(
+        'message.text or fileId is required',
+      );
+    }
 
-    const res = await firstValueFrom(
-      this.httpService.post(`${this.url}${pageId}/messages`, payload, {
-        params: {
-          access_token: this.configService.get('facebook.accessToken', {
-            infer: true,
-          }),
-        },
-      }),
-    );
+    const file = payload.fileId
+      ? await this.fileStorage.findById(payload.fileId)
+      : null;
+    if (payload.fileId && !file) {
+      throw new NotFoundException(`File ${payload.fileId} not found`);
+    }
 
-    await this.messagesService.create({
-      content: payload.message.text,
+    const base = {
       conversationId: payload.conversationId,
       messagePlatform: MessagePlatform.FACEBOOK,
       adminId: payload.adminId,
       senderType: SenderType.ADMIN,
-      timestamp: new Date(),
-    });
+    };
+    const results: unknown[] = [];
 
+    if (text) {
+      results.push(await this.sendToFacebook(payload, { text }));
+      await this.messagesService.create({
+        ...base,
+        content: text,
+        timestamp: new Date(),
+      });
+    }
+
+    if (file) {
+      const kind = kindFromExtension(getExtension(file.path));
+      results.push(
+        await this.sendToFacebook(payload, {
+          attachment: {
+            type: kind,
+            payload: {
+              url: await this.fileStorage.getPublicUrl(file),
+              is_reusable: true,
+            },
+          },
+        }),
+      );
+      await this.messagesService.create({
+        ...base,
+        // Original file name for every kind, so logs can show it.
+        content: payload.fileName?.trim() ?? '',
+        messageType: kind as MessageType,
+        fileId: file.id,
+        timestamp: new Date(),
+      });
+    }
+
+    return results.length === 1 ? results[0] : results;
+  }
+
+  private async sendToFacebook(
+    payload: FacebookPushMessageDto,
+    message: Record<string, unknown>,
+  ): Promise<unknown> {
+    const pageId = this.configService.get('facebook.pageId', { infer: true });
+    const res = await firstValueFrom(
+      this.httpService.post<unknown>(
+        `${this.url}${pageId}/messages`,
+        {
+          recipient: payload.recipient,
+          messaging_type: payload.messaging_type,
+          message,
+        },
+        {
+          params: {
+            access_token: this.configService.get('facebook.accessToken', {
+              infer: true,
+            }),
+          },
+        },
+      ),
+    ).catch((error: unknown) => {
+      // Pass Facebook's reason to the client instead of a bare 500.
+      const fb = (
+        error as {
+          response?: {
+            data?: { error?: { message?: string; error_user_msg?: string } };
+          };
+        }
+      ).response?.data?.error;
+      const reason =
+        fb?.error_user_msg ??
+        fb?.message ??
+        (error instanceof Error ? error.message : String(error));
+      this.logger.warn(`Facebook send failed: ${reason}`);
+      throw new BadGatewayException(`Facebook rejected the message: ${reason}`);
+    });
     return res.data;
   }
 

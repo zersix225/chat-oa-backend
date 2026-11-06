@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { FilesS3Controller } from './files.controller';
 import { MulterModule } from '@nestjs/platform-express';
+import { isAllowedFileName } from '../../../file-types';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { randomStringGenerator } from '@nestjs/common/utils/random-string-generator.util';
 import { S3Client } from '@aws-sdk/client-s3';
@@ -46,7 +47,7 @@ const infrastructurePersistenceModule = (databaseConfig() as DatabaseConfig)
 
         return {
           fileFilter: (request, file, callback) => {
-            if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/i)) {
+            if (!isAllowedFileName(file.originalname)) {
               return callback(
                 new UnprocessableEntityException({
                   status: HttpStatus.UNPROCESSABLE_ENTITY,

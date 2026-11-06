@@ -7,6 +7,7 @@ import { ConfigModule } from '@nestjs/config';
 import FacebookConfig from '@/auth-facebook/config/facebook.config';
 import { ContactsModule } from '@/contacts/contacts.module';
 import { ConversationsModule } from '@/conversations/conversations.module';
+import { FilesModule } from '@/files/files.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ConversationsModule } from '@/conversations/conversations.module';
     ContactsModule,
     ConversationsModule,
     HttpModule,
+    FilesModule,
     ConfigModule.forFeature(FacebookConfig),
   ],
   controllers: [FacebookController],

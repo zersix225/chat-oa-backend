@@ -8,6 +8,7 @@ import { AllConfigType } from '@/config/config.type';
 import { MessagesModule } from '@/messages/messages.module';
 import { ContactsModule } from '@/contacts/contacts.module';
 import { ConversationsModule } from '@/conversations/conversations.module';
+import { FilesModule } from '@/files/files.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { ConversationsModule } from '@/conversations/conversations.module';
     MessagesModule,
     ContactsModule,
     ConversationsModule,
+    FilesModule,
   ],
   controllers: [LineController],
   providers: [LineService],

@@ -7,9 +7,14 @@ import {
   JoinColumn,
   DeleteDateColumn,
 } from 'typeorm';
-import { MessagePlatform, SenderType } from '@/messages/domain/message';
+import {
+  MessagePlatform,
+  MessageType,
+  SenderType,
+} from '@/messages/domain/message';
 import { ConversationsEntity } from '@/conversations/infrastructure/persistence/relational/entities/conversations.entity';
 import { UserEntity } from '@/users/infrastructure/persistence/relational/entities/user.entity';
+import { FileEntity } from '@/files/infrastructure/persistence/relational/entities/file.entity';
 
 @Entity({
   name: 'message',
@@ -34,6 +39,26 @@ export class MessageEntity extends EntityRelationalHelper {
 
   @Column()
   content: string;
+
+  @Column({
+    type: 'enum',
+    enum: MessageType,
+    default: MessageType.TEXT,
+  })
+  messageType: MessageType;
+
+  @Column({ type: 'uuid', nullable: true })
+  fileId?: string | null;
+
+  // ManyToOne (not OneToOne) so an admin can send the same uploaded file
+  // more than once.
+  @ManyToOne(() => FileEntity, {
+    eager: true,
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'fileId' })
+  file?: FileEntity | null;
 
   @Column({
     type: 'enum',
