@@ -1,9 +1,11 @@
-import { Message } from '../../domain/message';
+import { Message, SenderType } from '../../domain/message';
 import { DeepPartial } from '@/utils/types/deep-partial.type';
 import { NullableType } from '@/utils/types/nullable.type';
+import { IPaginationOptions } from '@/utils/types/pagination-options';
 
 export interface ConversationItem {
   senderId: string;
+  senderType: SenderType;
   displayName: string;
   pictureUrl: string | null;
   lastMessage: string;
@@ -13,6 +15,7 @@ export interface ConversationItem {
 export interface MessageThreadItem {
   id: number;
   content: string;
+  senderType: SenderType;
   timestamp: Date;
   senderId: string;
   displayName: string;
@@ -21,6 +24,14 @@ export interface MessageThreadItem {
 
 export abstract class MessageRepository {
   abstract create(data: Omit<Message, 'id'>): Promise<Message>;
+
+  abstract findAllWithPaginationByAdmin({
+    paginationOptions,
+    conversationId,
+  }: {
+    paginationOptions: IPaginationOptions;
+    conversationId: Message['conversationId'];
+  }): Promise<{ massages: Message[]; total: number }>;
 
   abstract findById(id: Message['id']): Promise<NullableType<Message>>;
 

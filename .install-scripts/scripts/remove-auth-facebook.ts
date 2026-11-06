@@ -42,11 +42,11 @@ const removeFacebookAuth = () => {
     path: path.join(process.cwd(), 'src', 'config', 'config.type.ts'),
     actions: [
       {
-        find: /\s*facebook\: FacebookConfig.*/g,
+        find: /\s*facebook\: FacebookConfigType.*/g,
         replace: '',
       },
       {
-        find: /\s*import \{ FacebookConfig \}.*/g,
+        find: /\s*import \{ FacebookConfigType \}.*/g,
         replace: '',
       },
     ],

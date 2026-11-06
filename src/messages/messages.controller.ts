@@ -1,18 +1,9 @@
-import {
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { ApiOkResponse, ApiQuery, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Param, Query } from '@nestjs/common';
+import { ApiOkResponse, ApiParam, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { MessagesService } from './messages.service';
-import {
-  ConversationItem,
-  MessageThreadItem,
-} from './infrastructure/persistence/message.repository';
+import { InfinityPaginationResponse } from '@/utils/dto/infinity-pagination-response.dto';
+import { FindAllConversationsDto } from '@/conversations/dto/find-all-conversations.dto';
+import { Message } from '@/messages/domain/message';
 
 // @UseGuards(AuthGuard('jwt'))
 @ApiSecurity('bearer')
@@ -21,20 +12,48 @@ import {
 export class MessagesController {
   constructor(private readonly messagesService: MessagesService) {}
 
-  @Get('conversations')
-  @HttpCode(HttpStatus.OK)
-  @ApiOkResponse()
-  findConversations(): Promise<ConversationItem[]> {
-    return this.messagesService.findConversations();
-  }
+  // @Get('conversations')
+  // @HttpCode(HttpStatus.OK)
+  // @ApiOkResponse()
+  // findConversations(): Promise<ConversationItem[]> {
+  //   return this.messagesService.findConversations();
+  // }
 
-  @Get()
-  @HttpCode(HttpStatus.OK)
-  @ApiOkResponse()
-  @ApiQuery({ name: 'senderId', required: true, type: String })
-  findBySenderId(
-    @Query('senderId') senderId: string,
-  ): Promise<MessageThreadItem[]> {
-    return this.messagesService.findBySenderId(senderId);
+  // @Get(':id')
+  // @ApiParam({
+  //   name: 'id',
+  //   type: String,
+  //   required: true,
+  // })
+  // @ApiOkResponse({
+  //   type: Conversations,
+  // })
+  // findById(@Param('id') id: string) {
+  //   return this.messagesService.findById(id);
+  // }
+
+  @Get(':conversationId')
+  @ApiParam({
+    name: 'conversationId',
+    type: String,
+    required: true,
+  })
+  @ApiOkResponse({
+    type: InfinityPaginationResponse(Message),
+  })
+  async findAllByAdmin(
+    @Query() query: FindAllConversationsDto,
+    @Param('conversationId') conversationId: string,
+  ) {
+    const page = query?.page ?? 1;
+    let limit = query?.limit ?? 10;
+    if (limit > 50) {
+      limit = 50;
+    }
+
+    return await this.messagesService.findAllWithPaginationByAdmin({
+      paginationOptions: { page, limit },
+      conversationId,
+    });
   }
 }

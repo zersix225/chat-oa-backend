@@ -6,9 +6,12 @@ export class MessageMapper {
     const domain = new Message();
     domain.id = raw.id;
     domain.content = raw.content;
-    domain.senderId = raw.senderId;
+    domain.adminId = raw.adminId;
+    domain.admin = raw.admin;
     domain.messagePlatform = raw.messagePlatform;
+    domain.senderType = raw.senderType;
     domain.timestamp = raw.timestamp;
+
     return domain;
   }
 
@@ -18,9 +21,12 @@ export class MessageMapper {
       entity.id = domain.id;
     }
     entity.content = domain.content;
-    entity.senderId = domain.senderId;
+    entity.adminId = domain.adminId;
+    entity.conversationId = domain.conversationId;
     entity.messagePlatform = domain.messagePlatform;
+    entity.senderType = domain.senderType;
     entity.timestamp = domain.timestamp;
+
     return entity;
   }
 }

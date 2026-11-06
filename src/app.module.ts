@@ -1,4 +1,9 @@
-import { Module } from '@nestjs/common';
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
 import { UsersModule } from './users/users.module';
 import { FilesModule } from './files/files.module';
 import { AuthModule } from './auth/auth.module';
@@ -28,7 +33,10 @@ import { LineModule } from './webhooks/line/line.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MongooseConfigService } from './database/mongoose-config.service';
 import { DatabaseConfig } from './database/config/database-config.type';
-import { LineContactsModule } from './line-contacts/line-contacts.module';
+import { ContactsModule } from './contacts/contacts.module';
+import { WebSocketModule } from '@/websocket/websocket.module';
+import { FacebookModule } from '@/webhooks/facebook/facebook.module';
+import { json } from 'express';
 
 // <database-block>
 const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
@@ -44,8 +52,15 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     });
 // </database-block>
 
+import { ConversationsModule } from './conversations/conversations.module';
+import { TiktokModule } from '@/webhooks/tiktok/tiktok.module';
+
+import { ConversationReadsModule } from './conversation-reads/conversation-reads.module';
+
 @Module({
   imports: [
+    ConversationReadsModule,
+    ConversationsModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [
@@ -95,7 +110,17 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     MailerModule,
     HomeModule,
     LineModule,
-    LineContactsModule,
+    ContactsModule,
+    FacebookModule,
+    WebSocketModule,
+    TiktokModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(json())
+      .exclude({ path: '/webhooks/line', method: RequestMethod.POST })
+      .forRoutes('*');
+  }
+}

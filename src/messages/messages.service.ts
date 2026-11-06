@@ -3,20 +3,51 @@ import { Injectable } from '@nestjs/common';
 import {
   ConversationItem,
   MessageRepository,
-  MessageThreadItem,
 } from './infrastructure/persistence/message.repository';
 import { Message } from './domain/message';
-import { NullableType } from '@/utils/types/nullable.type';
+import { WebsocketGateway } from '@/websocket/websocket.gateway';
+import { ConversationsRepository } from '@/conversations/infrastructure/persistence/conversations.repository';
+import { IPaginationOptions } from '@/utils/types/pagination-options';
 
 @Injectable()
 export class MessagesService {
-  constructor(private readonly messageRepository: MessageRepository) {}
+  constructor(
+    private readonly messageRepository: MessageRepository,
+    private readonly conversationRepository: ConversationsRepository,
+    private readonly webhookGateway: WebsocketGateway,
+  ) {}
 
   async create(payload: CreateMessageDto): Promise<Message> {
-    return this.messageRepository.create(payload);
+    const message = await this.messageRepository.create(payload);
+    await this.conversationRepository.update(payload.conversationId, {
+      lastMessageId: message.id,
+    });
+
+    // Emit only after it is saved, so clients get the real id.
+    this.webhookGateway.emitNewMessage({
+      ...message,
+      conversationId: payload.conversationId,
+    });
+    return message;
   }
 
-  async findById(id: Message['id']): Promise<NullableType<Message>> {
+  findAllWithPaginationByAdmin({
+    paginationOptions,
+    conversationId,
+  }: {
+    paginationOptions: IPaginationOptions;
+    conversationId: Message['conversationId'];
+  }) {
+    return this.messageRepository.findAllWithPaginationByAdmin({
+      paginationOptions: {
+        page: paginationOptions.page,
+        limit: paginationOptions.limit,
+      },
+      conversationId,
+    });
+  }
+
+  async findById(id: Message['id']) {
     return this.messageRepository.findById(id);
   }
 
@@ -24,7 +55,9 @@ export class MessagesService {
     return this.messageRepository.findConversations();
   }
 
-  async findBySenderId(senderId: string): Promise<MessageThreadItem[]> {
-    return this.messageRepository.findBySenderId(senderId);
-  }
+  // async findBySenderId(
+  //   customerId: Message['customerId'],
+  // ): Promise<MessageThreadItem[]> {
+  //   return this.messageRepository.findBySenderId(customerId);
+  // }
 }

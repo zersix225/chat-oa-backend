@@ -7,27 +7,56 @@ import {
   MessageRepository,
   MessageThreadItem,
 } from '../../message.repository';
-import { Message } from '@/messages/domain/message';
+import { Message, SenderType } from '@/messages/domain/message';
 import { MessageMapper } from '../mappers/message.mapper';
 import { NullableType } from '@/utils/types/nullable.type';
 import { DeepPartial } from '@/utils/types/deep-partial.type';
+import { IPaginationOptions } from '@/utils/types/pagination-options';
 
 @Injectable()
 export class MessagesRelationalRepository implements MessageRepository {
   constructor(
     @InjectRepository(MessageEntity)
-    private readonly repository: Repository<MessageEntity>,
+    private readonly messageRepository: Repository<MessageEntity>,
   ) {}
 
-  async create(data: Omit<Message, 'id'>): Promise<Message> {
-    const entity = await this.repository.save(
-      this.repository.create(MessageMapper.toPersistence(data as Message)),
+  async create(data: Message): Promise<Message> {
+    const entity = await this.messageRepository.save(
+      this.messageRepository.create(MessageMapper.toPersistence(data)),
     );
     return MessageMapper.toDomain(entity);
   }
 
+  async findAllWithPaginationByAdmin({
+    paginationOptions,
+    conversationId,
+  }: {
+    paginationOptions: IPaginationOptions;
+    conversationId: Message['conversationId'];
+  }): Promise<{ massages: Message[]; total: number }> {
+    const [entities, total] = await this.messageRepository.findAndCount({
+      skip: (paginationOptions.page - 1) * paginationOptions.limit,
+      take: paginationOptions.limit,
+      relations: {
+        admin: true,
+      },
+      where: {
+        senderType: SenderType.ADMIN,
+        conversationId: conversationId,
+      },
+      order: {
+        timestamp: 'DESC',
+      },
+    });
+
+    return {
+      massages: entities.map((entity) => MessageMapper.toDomain(entity)),
+      total,
+    };
+  }
+
   async findById(id: Message['id']): Promise<NullableType<Message>> {
-    const entity = await this.repository.findOne({ where: { id } });
+    const entity = await this.messageRepository.findOne({ where: { id } });
     return entity ? MessageMapper.toDomain(entity) : null;
   }
 
@@ -35,10 +64,10 @@ export class MessagesRelationalRepository implements MessageRepository {
     id: Message['id'],
     payload: DeepPartial<Message>,
   ): Promise<Message | null> {
-    const entity = await this.repository.findOne({ where: { id } });
+    const entity = await this.messageRepository.findOne({ where: { id } });
     if (!entity) return null;
-    const updated = await this.repository.save(
-      this.repository.create(
+    const updated = await this.messageRepository.save(
+      this.messageRepository.create(
         MessageMapper.toPersistence({
           ...MessageMapper.toDomain(entity),
           ...payload,
@@ -49,19 +78,20 @@ export class MessagesRelationalRepository implements MessageRepository {
   }
 
   async remove(id: Message['id']): Promise<void> {
-    await this.repository.softDelete(id);
+    await this.messageRepository.softDelete(id);
   }
 
   async findBySenderId(senderId: string): Promise<MessageThreadItem[]> {
-    const rows = await this.repository
+    const rows = await this.messageRepository
       .createQueryBuilder('m')
       .select('m.id', 'id')
       .addSelect('m.content', 'content')
       .addSelect('m.timestamp', 'timestamp')
       .addSelect('m."senderId"', 'senderId')
+      .addSelect('m."senderType"', 'senderType')
       .addSelect('lc."displayName"', 'displayName')
       .addSelect('lc."pictureUrl"', 'pictureUrl')
-      .leftJoin('line_contact', 'lc', 'lc."lineUserId" = m."senderId"')
+      .leftJoin('customerId', 'c', 'c."customerId" = m."senderId"')
       .where('m."senderId" = :senderId', { senderId })
       .orderBy('m.timestamp', 'ASC')
       .getRawMany();
@@ -71,15 +101,17 @@ export class MessagesRelationalRepository implements MessageRepository {
       content: r.content,
       timestamp: r.timestamp,
       senderId: r.senderId,
+      senderType: r.senderType,
       displayName: r.displayName ?? r.senderId,
       pictureUrl: r.pictureUrl ?? null,
     }));
   }
 
   async findConversations(): Promise<ConversationItem[]> {
-    const rows = await this.repository
+    const rows = await this.messageRepository
       .createQueryBuilder('m')
       .select('m."senderId"', 'senderId')
+      .addSelect('m."sender_type"', 'senderType')
       .addSelect('m.content', 'lastMessage')
       .addSelect('m.timestamp', 'lastTimestamp')
       .addSelect('lc."displayName"', 'displayName')
@@ -100,6 +132,7 @@ export class MessagesRelationalRepository implements MessageRepository {
 
     return rows.map((r) => ({
       senderId: r.senderId,
+      senderType: r.senderType,
       displayName: r.displayName ?? r.senderId,
       pictureUrl: r.pictureUrl ?? null,
       lastMessage: r.lastMessage,

@@ -4,10 +4,8 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  UseGuards,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { webhook } from '@line/bot-sdk';
 import { LineService } from './line.service';
 import { ApiSecurity, ApiTags } from '@nestjs/swagger';
@@ -32,6 +30,6 @@ export class LineController {
   @ApiSecurity('bearer')
   @HttpCode(HttpStatus.OK)
   pushMessage(@Body() body: PushMessageDto) {
-    return this.lineService.pushMessage(body.message, body.lineUserId);
+    return this.lineService.pushMessage(body);
   }
 }
