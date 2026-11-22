@@ -86,7 +86,7 @@ export class LineService {
       const url = await this.fileStorage.getPublicUrl(file);
       messages.push({
         type: 'text',
-        text: `📎 ${fileName ?? 'File'}\n${url}`,
+        text: `${fileName ?? 'File'}\n${url}`,
       });
     }
 
