@@ -66,7 +66,7 @@ export class FilesS3PresignedService {
       throw new PayloadTooLargeException({
         statusCode: HttpStatus.PAYLOAD_TOO_LARGE,
         error: 'Payload Too Large',
-        message: 'File too large',
+        message: 'fileTooLarge',
       });
     }
 

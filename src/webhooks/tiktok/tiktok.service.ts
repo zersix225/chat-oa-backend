@@ -25,6 +25,7 @@ import { getExtension, kindFromExtension } from '@/files/file-types';
 import { TiktokAccountsService } from '@/tiktok-accounts/tiktok-accounts.service';
 import { TiktokOauthService } from '@/webhooks/tiktok/tiktok-oauth.service';
 import { TiktokApiClient } from '@/webhooks/tiktok/tiktok-api.client';
+import { i18nError } from '@/utils/i18n-error';
 
 const SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 const SEEN_MESSAGE_LIMIT = 1000;
@@ -211,14 +212,18 @@ export class TiktokService {
 
   async pushMessage(payload: TiktokPushMessageDto) {
     if (!payload.text && !payload.fileId) {
-      throw new UnprocessableEntityException('text or fileId is required');
+      throw new UnprocessableEntityException(
+        i18nError('messageOrFileRequired'),
+      );
     }
 
     const file = payload.fileId
       ? await this.fileStorage.findById(payload.fileId)
       : null;
     if (payload.fileId && !file) {
-      throw new NotFoundException(`File ${payload.fileId} not found`);
+      throw new NotFoundException(
+        i18nError('fileNotFound', { id: payload.fileId! }),
+      );
     }
     const kind = file ? kindFromExtension(getExtension(file.path)) : null;
     const fileName = payload.fileName?.trim() || null;
@@ -270,9 +275,7 @@ export class TiktokService {
       paginationOptions: { page: 1, limit: 2 },
     });
     if (accounts.length === 0) {
-      throw new ConflictException(
-        'No TikTok account is connected. Connect one on the TikTok accounts page.',
-      );
+      throw new ConflictException(i18nError('tiktokNotConnected'));
     }
     if (accounts.length > 1) {
       this.logger.warn(

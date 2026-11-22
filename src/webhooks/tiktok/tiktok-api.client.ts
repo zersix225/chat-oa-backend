@@ -4,6 +4,7 @@ import { HttpService } from '@nestjs/axios';
 import { isAxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { AllConfigType } from '@/config/config.type';
+import { i18nError } from '@/utils/i18n-error';
 
 const SEND_MESSAGE_PATH = '/business/message/send/';
 
@@ -68,7 +69,7 @@ export class TiktokApiClient {
     } catch (error) {
       const reason = this.describeError(error);
       this.logger.warn(`TikTok ${path} failed: ${reason}`);
-      throw new BadGatewayException(`TikTok rejected the message: ${reason}`);
+      throw new BadGatewayException(i18nError('tiktokRejected', { reason }));
     }
 
     // TikTok API for Business returns HTTP 200 with a non-zero `code` on error.
@@ -78,7 +79,7 @@ export class TiktokApiClient {
       this.logger.warn(
         `TikTok ${path} error: ${reason} (request_id=${envelope?.request_id ?? '-'})`,
       );
-      throw new BadGatewayException(`TikTok rejected the message: ${reason}`);
+      throw new BadGatewayException(i18nError('tiktokRejected', { reason }));
     }
     return envelope.data;
   }

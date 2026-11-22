@@ -19,6 +19,7 @@ import {
   getExtension,
   mimeFromExtension,
 } from './file-types';
+import { i18nError } from '@/utils/i18n-error';
 
 const LOCAL_DIR = './files';
 
@@ -69,7 +70,7 @@ export class FileStorageService {
 
   async store(input: StoreFileInput): Promise<FileType> {
     if (input.buffer.length > this.maxFileSize) {
-      throw new PayloadTooLargeException('File too large');
+      throw new PayloadTooLargeException(i18nError('fileTooLarge'));
     }
 
     const ext =
@@ -112,7 +113,7 @@ export class FileStorageService {
     }
     const length = Number(res.headers.get('content-length') ?? 0);
     if (length > this.maxFileSize) {
-      throw new PayloadTooLargeException('File too large');
+      throw new PayloadTooLargeException(i18nError('fileTooLarge'));
     }
     const buffer = await this.readLimited(
       Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]),
@@ -133,7 +134,7 @@ export class FileStorageService {
       size += buf.length;
       if (size > this.maxFileSize) {
         stream.destroy();
-        throw new PayloadTooLargeException('File too large');
+        throw new PayloadTooLargeException(i18nError('fileTooLarge'));
       }
       chunks.push(buf);
     }

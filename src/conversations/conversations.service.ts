@@ -17,6 +17,7 @@ import { UsersService } from '@/users/users.service';
 import { WebsocketGateway } from '@/websocket/websocket.gateway';
 import { User } from '@/users/domain/user';
 import { RoleEnum } from '@/roles/roles.enum';
+import { i18nError } from '@/utils/i18n-error';
 
 @Injectable()
 export class ConversationsService {
@@ -48,7 +49,7 @@ export class ConversationsService {
   async findById(id: Conversations['id']) {
     const conversation = await this.conversationsRepository.findById(id);
     if (!conversation) {
-      throw new NotFoundException(`Conversation ${id} not found`);
+      throw new NotFoundException(i18nError('conversationNotFound'));
     }
     return conversation;
   }
@@ -122,20 +123,20 @@ export class ConversationsService {
   ): Promise<Conversations> {
     const conversation = await this.conversationsRepository.findById(id);
     if (!conversation) {
-      throw new NotFoundException(`Conversation ${id} not found`);
+      throw new NotFoundException(i18nError('conversationNotFound'));
     }
 
     const assignee = assigneeId
       ? await this.usersService.findById(assigneeId)
       : null;
     if (assigneeId && !assignee) {
-      throw new NotFoundException(`User ${assigneeId} not found`);
+      throw new NotFoundException(i18nError('assigneeNotFound'));
     }
 
     const assignedBy = await this.usersService.findById(assignedById);
 
     if (!this.isAdmin(assignedBy) && this.isAdmin(assignee)) {
-      throw new ForbiddenException('Members cannot assign chats to an admin');
+      throw new ForbiddenException(i18nError('membersCannotAssign'));
     }
 
     const newAssigneeId = assignee ? Number(assignee.id) : null;

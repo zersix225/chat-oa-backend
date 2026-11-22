@@ -28,6 +28,7 @@ import { ContactPlatform } from '@/contacts/domain/contact';
 import { ContactsService } from '@/contacts/contacts.service';
 import { FacebookPushMessageDto } from '@/webhooks/facebook/dto/push-message.dto';
 import { ConversationsService } from '@/conversations/conversations.service';
+import { i18nError } from '@/utils/i18n-error';
 
 @Injectable()
 export class FacebookService {
@@ -147,7 +148,7 @@ export class FacebookService {
     const text = payload.message?.text;
     if (!text && !payload.fileId) {
       throw new UnprocessableEntityException(
-        'message.text or fileId is required',
+        i18nError('messageOrFileRequired'),
       );
     }
 
@@ -155,7 +156,9 @@ export class FacebookService {
       ? await this.fileStorage.findById(payload.fileId)
       : null;
     if (payload.fileId && !file) {
-      throw new NotFoundException(`File ${payload.fileId} not found`);
+      throw new NotFoundException(
+        i18nError('fileNotFound', { id: payload.fileId! }),
+      );
     }
 
     const base = {
@@ -236,7 +239,7 @@ export class FacebookService {
         fb?.message ??
         (error instanceof Error ? error.message : String(error));
       this.logger.warn(`Facebook send failed: ${reason}`);
-      throw new BadGatewayException(`Facebook rejected the message: ${reason}`);
+      throw new BadGatewayException(i18nError('facebookRejected', { reason }));
     });
     return res.data;
   }

@@ -27,6 +27,7 @@ import { ContactsService } from '@/contacts/contacts.service';
 import { ContactPlatform } from '@/contacts/domain/contact';
 import { ConversationsService } from '@/conversations/conversations.service';
 import { PushMessageDto } from '@/webhooks/line/dto/push-message.dto';
+import { i18nError } from '@/utils/i18n-error';
 
 @Injectable()
 export class LineService {
@@ -64,14 +65,18 @@ export class LineService {
    */
   async pushMessage(payload: PushMessageDto) {
     if (!payload.message && !payload.fileId) {
-      throw new UnprocessableEntityException('message or fileId is required');
+      throw new UnprocessableEntityException(
+        i18nError('messageOrFileRequired'),
+      );
     }
 
     const file = payload.fileId
       ? await this.fileStorage.findById(payload.fileId)
       : null;
     if (payload.fileId && !file) {
-      throw new NotFoundException(`File ${payload.fileId} not found`);
+      throw new NotFoundException(
+        i18nError('fileNotFound', { id: payload.fileId! }),
+      );
     }
     const kind = file ? kindFromExtension(getExtension(file.path)) : null;
     const fileName = payload.fileName?.trim() || null;
@@ -96,7 +101,7 @@ export class LineService {
         // Pass LINE's reason to the client instead of a bare 500.
         const reason = this.lineErrorReason(error);
         this.logger.warn(`LINE push failed: ${reason}`);
-        throw new BadGatewayException(`LINE rejected the message: ${reason}`);
+        throw new BadGatewayException(i18nError('lineRejected', { reason }));
       });
 
     const base = {
@@ -143,9 +148,9 @@ export class LineService {
       });
     } catch (error) {
       throw new UnprocessableEntityException(
-        `Could not prepare the image for LINE: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        i18nError('lineImageFailed', {
+          reason: error instanceof Error ? error.message : String(error),
+        }),
       );
     }
     return {
