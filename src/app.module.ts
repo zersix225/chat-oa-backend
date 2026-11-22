@@ -57,8 +57,11 @@ import { TiktokModule } from '@/webhooks/tiktok/tiktok.module';
 
 import { ConversationReadsModule } from './conversation-reads/conversation-reads.module';
 
+import { TiktokAccountsModule } from './tiktok-accounts/tiktok-accounts.module';
+
 @Module({
   imports: [
+    TiktokAccountsModule,
     ConversationReadsModule,
     ConversationsModule,
     ConfigModule.forRoot({

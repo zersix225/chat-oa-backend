@@ -1,7 +1,8 @@
 import {
+  ConflictException,
   Injectable,
   Logger,
-  NotImplementedException,
+  NotFoundException,
   UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -10,14 +11,53 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { AllConfigType } from '@/config/config.type';
 import { TiktokWebhookDto } from '@/webhooks/tiktok/dto/webhook.dto';
 import { TiktokPushMessageDto } from '@/webhooks/tiktok/dto/push-message.dto';
+import { MessagesService } from '@/messages/messages.service';
+import {
+  MessagePlatform,
+  MessageType,
+  SenderType,
+} from '@/messages/domain/message';
+import { ContactsService } from '@/contacts/contacts.service';
+import { ContactPlatform } from '@/contacts/domain/contact';
+import { ConversationsService } from '@/conversations/conversations.service';
+import { FileStorageService } from '@/files/file-storage.service';
+import { getExtension, kindFromExtension } from '@/files/file-types';
+import { TiktokAccountsService } from '@/tiktok-accounts/tiktok-accounts.service';
+import { TiktokOauthService } from '@/webhooks/tiktok/tiktok-oauth.service';
+import { TiktokApiClient } from '@/webhooks/tiktok/tiktok-api.client';
 
 const SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
+const SEEN_MESSAGE_LIMIT = 1000;
+
+type TiktokMessageContent = {
+  conversation_id?: string;
+  message_id?: string;
+  type?: string;
+  timestamp?: number;
+  from?: string;
+  text?: { body?: string };
+  sticker?: { url?: string };
+  emoji?: { url?: string };
+  share_post?: { embed_url?: string };
+  template?: { title?: string };
+};
 
 @Injectable()
 export class TiktokService {
   private readonly logger = new Logger(TiktokService.name);
 
-  constructor(private readonly configService: ConfigService<AllConfigType>) {}
+  private readonly seenMessageIds = new Set<string>();
+
+  constructor(
+    private readonly configService: ConfigService<AllConfigType>,
+    private readonly messagesService: MessagesService,
+    private readonly contactsService: ContactsService,
+    private readonly conversationsService: ConversationsService,
+    private readonly fileStorage: FileStorageService,
+    private readonly tiktokAccountsService: TiktokAccountsService,
+    private readonly tiktokOauthService: TiktokOauthService,
+    private readonly tiktokApi: TiktokApiClient,
+  ) {}
 
   verifySignature(header: string | undefined, rawBody: Buffer | undefined) {
     const secret = this.configService.get('tiktok.clientSecret', {
@@ -60,19 +100,186 @@ export class TiktokService {
     }
   }
 
-  handleWebhook(body: TiktokWebhookDto) {
+  async handleWebhook(body: TiktokWebhookDto) {
     const content = this.parseContent(body.content);
     this.logger.log(
       `TikTok event ${body.event} for ${body.user_openid ?? 'unknown user'}: ${JSON.stringify(content)}`,
     );
+
+    if (body.event === 'im_receive_msg' && this.isObject(content)) {
+      await this.handleIncomingMessage(
+        content as TiktokMessageContent,
+        body.create_time,
+      );
+    }
+
     return { received: true };
   }
 
-  pushMessage(payload: TiktokPushMessageDto): never {
+  private async handleIncomingMessage(
+    content: TiktokMessageContent,
+    createTime: number,
+  ) {
+    const conversationId = content.conversation_id;
+    if (!conversationId) return;
+
+    const messageId = content.message_id;
+    if (messageId && this.seenMessageIds.has(messageId)) return;
+
+    const incoming = this.toIncomingMessage(content);
+    if (!incoming) return;
+
+    let contact = await this.contactsService.findLineUserId(conversationId);
+    if (!contact) {
+      contact = await this.contactsService.create({
+        customerId: conversationId,
+        displayName: content.from || 'TikTok user',
+        pictureUrl: null,
+        contactPlatform: ContactPlatform.TIKTOK,
+      });
+    }
+
+    let conversation = await this.conversationsService.findByContactId(
+      contact.id,
+    );
+    if (!conversation) {
+      conversation = await this.conversationsService.create({
+        contactId: contact.id,
+      });
+    }
+
+    await this.messagesService.create({
+      ...incoming,
+      conversationId: conversation.id,
+      adminId: null,
+      messagePlatform: MessagePlatform.TIKTOK,
+      senderType: SenderType.USER,
+      timestamp: this.toDate(content.timestamp ?? createTime),
+    });
+
+    if (messageId) this.rememberMessageId(messageId);
+  }
+
+  private toIncomingMessage(
+    content: TiktokMessageContent,
+  ): { content: string; messageType: MessageType } | null {
+    switch (content.type?.toLowerCase()) {
+      case 'text':
+        return content.text?.body
+          ? { content: content.text.body, messageType: MessageType.TEXT }
+          : null;
+      case 'sticker':
+      case 'emoji': {
+        const url = content.sticker?.url ?? content.emoji?.url;
+        return url ? { content: url, messageType: MessageType.STICKER } : null;
+      }
+      case 'share_post':
+        return content.share_post?.embed_url
+          ? {
+              content: content.share_post.embed_url,
+              messageType: MessageType.TEXT,
+            }
+          : null;
+      case 'template':
+        return content.template?.title
+          ? { content: content.template.title, messageType: MessageType.TEXT }
+          : null;
+      case 'image':
+        return { content: '[image]', messageType: MessageType.TEXT };
+      case 'video':
+        return { content: '[video]', messageType: MessageType.TEXT };
+      default:
+        return null;
+    }
+  }
+
+  private rememberMessageId(messageId: string) {
+    this.seenMessageIds.add(messageId);
+    if (this.seenMessageIds.size > SEEN_MESSAGE_LIMIT) {
+      const oldest = this.seenMessageIds.values().next().value;
+      if (oldest) this.seenMessageIds.delete(oldest);
+    }
+  }
+
+  private toDate(time: number): Date {
+    return new Date(time < 1e12 ? time * 1000 : time);
+  }
+
+  private isObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+  }
+
+  async pushMessage(payload: TiktokPushMessageDto) {
     if (!payload.text && !payload.fileId) {
       throw new UnprocessableEntityException('text or fileId is required');
     }
-    throw new NotImplementedException('TikTok push is not implemented yet');
+
+    const file = payload.fileId
+      ? await this.fileStorage.findById(payload.fileId)
+      : null;
+    if (payload.fileId && !file) {
+      throw new NotFoundException(`File ${payload.fileId} not found`);
+    }
+    const kind = file ? kindFromExtension(getExtension(file.path)) : null;
+    const fileName = payload.fileName?.trim() || null;
+
+    const sender = await this.getSendingAccount();
+    const target = {
+      accessToken: await this.tiktokOauthService.getValidAccessToken(
+        sender.openId,
+      ),
+      businessId: sender.openId,
+      conversationId: payload.recipientId,
+    };
+
+    if (payload.text) {
+      await this.tiktokApi.sendText(target, payload.text);
+    }
+    if (file) {
+      // Sent as a link until TikTok's image upload flow is verified.
+      const url = await this.fileStorage.getPublicUrl(file);
+      await this.tiktokApi.sendText(target, `${fileName ?? 'File'}\n${url}`);
+    }
+
+    const base = {
+      conversationId: payload.conversationId,
+      messagePlatform: MessagePlatform.TIKTOK,
+      adminId: payload.adminId,
+      senderType: SenderType.ADMIN,
+      timestamp: new Date(),
+    };
+    if (payload.text) {
+      await this.messagesService.create({ ...base, content: payload.text });
+    }
+    if (file && kind) {
+      await this.messagesService.create({
+        ...base,
+        content: fileName ?? '',
+        messageType: kind as MessageType,
+        fileId: file.id,
+      });
+    }
+  }
+
+  /**
+   * The business account replies are sent from. Only one connected account is
+   * supported for now; conversations aren't yet linked to a specific account.
+   */
+  private async getSendingAccount() {
+    const accounts = await this.tiktokAccountsService.findAllWithPagination({
+      paginationOptions: { page: 1, limit: 2 },
+    });
+    if (accounts.length === 0) {
+      throw new ConflictException(
+        'No TikTok account is connected. Connect one on the TikTok accounts page.',
+      );
+    }
+    if (accounts.length > 1) {
+      this.logger.warn(
+        `Multiple TikTok accounts connected; replying as ${accounts[0].displayName ?? accounts[0].openId}`,
+      );
+    }
+    return accounts[0];
   }
 
   private parseContent(content: string | undefined): unknown {

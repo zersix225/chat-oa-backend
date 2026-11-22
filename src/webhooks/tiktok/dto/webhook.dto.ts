@@ -2,15 +2,19 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class TiktokWebhookDto {
-  @ApiProperty({ description: 'App client key the event belongs to' })
+  @ApiProperty({
+    required: false,
+    description: 'App client key the event belongs to',
+  })
+  @IsOptional()
   @IsString()
-  client_key: string;
+  client_key?: string;
 
   @ApiProperty({ description: 'Event name, e.g. authorization.removed' })
   @IsString()
   event: string;
 
-  @ApiProperty({ description: 'Unix timestamp (seconds)' })
+  @ApiProperty({ description: 'Unix timestamp (milliseconds)' })
   @IsNumber()
   create_time: number;
 

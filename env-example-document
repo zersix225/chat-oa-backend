@@ -56,6 +56,11 @@ LINE_CHANNEL_NAME=change-me
 
 TIKTOK_CLIENT_KEY=change-me
 TIKTOK_CLIENT_SECRET=
+# Defaults to {PUBLIC_BACKEND_DOMAIN}/{API_PREFIX}/webhooks/tiktok/oauth/callback
+TIKTOK_REDIRECT_URI=
+# Comma-separated; must match the scopes enabled in the TikTok developer portal
+TIKTOK_SCOPES=user.info.basic
+TIKTOK_BUSINESS_API_BASE_URL=https://business-api.tiktok.com/open_api/v1.3
 
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
