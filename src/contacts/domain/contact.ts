@@ -4,6 +4,7 @@ export enum ContactPlatform {
   LINE = 'line',
   FACEBOOK = 'facebook',
   INSTAGRAM = 'instagram',
+  TIKTOK = 'tiktok',
 }
 
 export class Contact {

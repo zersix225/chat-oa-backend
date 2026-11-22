@@ -7,6 +7,7 @@ import { FileConfig } from '@/files/config/file-config.type';
 import { GoogleConfig } from '@/auth-google/config/google-config.type';
 import { MailConfig } from '@/mail/config/mail-config.type';
 import { LineConfig } from '@/webhooks/line/config/line-config.type';
+import { TiktokConfig } from '@/webhooks/tiktok/config/tiktok-config.type';
 
 export type AllConfigType = {
   app: AppConfig;
@@ -18,4 +19,5 @@ export type AllConfigType = {
   google: GoogleConfig;
   mail: MailConfig;
   line: LineConfig;
+  tiktok: TiktokConfig;
 };

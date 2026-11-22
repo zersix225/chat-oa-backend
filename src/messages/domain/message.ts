@@ -6,6 +6,7 @@ export enum MessagePlatform {
   LINE = 'line',
   FACEBOOK = 'facebook',
   INSTAGRAM = 'instagram',
+  TIKTOK = 'tiktok',
 }
 
 export enum SenderType {
