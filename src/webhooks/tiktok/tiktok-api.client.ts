@@ -86,9 +86,7 @@ export class TiktokApiClient {
   private describeError(error: unknown): string {
     if (isAxiosError(error)) {
       const data = error.response?.data as
-        | TiktokBusinessEnvelope
-        | string
-        | undefined;
+        TiktokBusinessEnvelope | string | undefined;
       if (data && typeof data === 'object' && 'message' in data) {
         return `${error.response?.status ?? ''} ${data.message ?? ''}`.trim();
       }
